@@ -1,0 +1,24 @@
+{
+  "name": "mern-qms",
+  "version": "1.0.0",
+  "description": "Microservices Quiz Management System",
+  "scripts": {
+    "start-auth": "cd server/auth-service && node src/index.js",
+    "start-quiz": "cd server/quiz-service && node src/index.js",
+    "start-assessment": "cd server/assessment-service && node src/index.js",
+    "start-reporting": "cd server/reporting-service && node src/index.js",
+    "start-gateway": "cd server/api-gateway && node index.js",
+    "start-server": "concurrently \"npm run start-auth\" \"npm run start-quiz\" \"npm run start-assessment\" \"npm run start-reporting\" \"npm run start-gateway\"",
+    "start-client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run start-server\" \"npm run start-client\"",
+    "install-all": "npm install && cd client && npm install && cd ../server/auth-service && npm install && cd ../quiz-service && npm install && cd ../assessment-service && npm install && cd ../reporting-service && npm install && cd ../api-gateway && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "mongoose": "^9.1.1"
+  }
+}
