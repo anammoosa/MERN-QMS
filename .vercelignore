@@ -1,0 +1,15 @@
+node_modules
+server
+scripts
+seedAdmin.js
+docker-compose.yml
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+dist
+coverage
+.vscode
+.idea
+

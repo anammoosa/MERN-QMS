@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const GATEWAY_URL = 'http://localhost:8002/api';
+const GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8002/api';
 const AUTH_URL = `${GATEWAY_URL}/auth`;
 const QUIZ_URL = `${GATEWAY_URL}/quizzes`;
 const ASSESSMENT_URL = `${GATEWAY_URL}/assessment`;
