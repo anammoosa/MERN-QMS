@@ -8,18 +8,43 @@ import {
   LogOut,
   Play,
   Clock,
+  Sparkles,
   FileText,
   ChevronLeft,
-  Sparkles,
   Calendar,
-  Trophy
+  Trophy,
+  History
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const StudentDashboard = () => {
   const { logout, user } = useAuth();
-  const { quizzes, getQuizzes } = useQuiz();
+  const { quizzes, getQuizzes, loading } = useQuiz();
   const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [history, setHistory] = useState([]);
+
+  // Fetch history directly here or via hook - keeping it simple
+  useEffect(() => {
+    import('../services/api').then(({ reportingService, quizService }) => {
+      if (user?.id) {
+        reportingService.getStudentHistory(user.id).then(async (res) => {
+          // Enrich with quiz titles if needed (or backend should populate)
+          // For now, let's assume we might need to match with 'quizzes' or fetch
+          const subs = res.data;
+          const enriched = await Promise.all(subs.map(async s => {
+            if (!s.quizTitle) {
+              try {
+                const q = await quizService.getQuiz(s.quizId);
+                return { ...s, quizTitle: q.data.title };
+              } catch (e) { return { ...s, quizTitle: 'Unknown Assessment' }; }
+            }
+            return s;
+          }));
+          setHistory(enriched);
+        }).catch(err => console.error(err));
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     getQuizzes(null); // Fetch all published quizzes
@@ -71,8 +96,13 @@ const StudentDashboard = () => {
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className="min-h-screen p-4 md:p-8 bg-[#0b0f1a] text-slate-200"
+      className="min-h-screen p-4 md:p-8 bg-[#0b0f1a] text-slate-200 relative"
     >
+      {loading && (
+        <div className="absolute inset-0 bg-[#0b0f1a]/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+        </div>
+      )}
       {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
         <div className="flex items-center gap-5">
@@ -121,6 +151,30 @@ const StudentDashboard = () => {
           </p>
         </div>
       </motion.div>
+
+      {/* Recent History Section */}
+      {history.length > 0 && (
+        <div className="mb-12">
+          <h3 className="flex items-center gap-3 text-lg font-black text-slate-400 uppercase tracking-widest mb-6 px-2">
+            <History className="text-indigo-400" /> Recent Performance
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {history.map((att) => (
+              <div key={att._id} className="glass-card p-6 flex items-center justify-between border-l-4 border-l-emerald-500">
+                <div>
+                  <p className="text-white font-bold text-lg">{att.quizTitle || 'Assessment'}</p>
+                  <p className="text-slate-500 text-xs font-mono mt-1">
+                    {new Date(att.submittedAt).toLocaleDateString()} • Score: <span className="text-emerald-400 font-bold">{att.score}</span>
+                  </p>
+                </div>
+                <div className="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-black uppercase tracking-widest">
+                  {att.status}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quizzes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

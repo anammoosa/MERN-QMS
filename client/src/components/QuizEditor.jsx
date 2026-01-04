@@ -1,19 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, HelpCircle, AlignLeft, CheckSquare, Type } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const QuizEditor = ({ instructorId, onSave, isLoading }) => {
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [duration, setDuration] = useState('');
-    const [questions, setQuestions] = useState([]);
+const QuizEditor = ({ instructorId, onSave, isLoading, initialData = null }) => {
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [description, setDescription] = useState(initialData?.description || '');
+    const [duration, setDuration] = useState(initialData?.duration || '');
+    const [questions, setQuestions] = useState(initialData?.questions || []);
+
+    // Effect to update state when initialData changes (e.g., switching from Edit to Create)
+    useEffect(() => {
+        if (initialData) {
+            setTitle(initialData.title);
+            setDescription(initialData.description || '');
+            setDuration(initialData.duration || '');
+            setQuestions(initialData.questions?.filter(q => q).map(q => ({
+                ...q,
+                id: q.id || q._id || `temp-${Date.now()}-${Math.random()}`,
+                // Ensure T/F has options for student view rendering
+                options: (q.type === 'True/False' && (!q.options || q.options.length === 0))
+                    ? ['True', 'False']
+                    : q.options
+            })) || []);
+        } else {
+            setTitle('');
+            setDescription('');
+            setDuration('');
+            setQuestions([]);
+        }
+    }, [initialData]);
 
     const addQuestion = (type) => {
         setQuestions([...questions, {
             id: Date.now(),
             text: '',
             type,
-            options: type === 'MCQ' || type === 'Multi-Select' ? ['', '', '', ''] : [],
+            options: type === 'True/False'
+                ? ['True', 'False']
+                : (type === 'MCQ' || type === 'Multi-Select' ? ['', '', '', ''] : []),
             correctAnswer: type === 'Multi-Select' ? [] : '',
             points: 1
         }]);
@@ -54,7 +78,7 @@ const QuizEditor = ({ instructorId, onSave, isLoading }) => {
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                     <div className="space-y-2">
@@ -88,7 +112,7 @@ const QuizEditor = ({ instructorId, onSave, isLoading }) => {
                             onChange={e => setDuration(e.target.value)}
                         />
                     </div>
-                    <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 h-[calc(100%-84px)] flex flex-col justify-center items-center text-center">
+                    <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col justify-center items-center text-center">
                         <p className="text-sm text-indigo-300 font-medium mb-4">Add modules to your architect</p>
                         <div className="flex flex-wrap justify-center gap-3">
                             <button onClick={() => addQuestion('MCQ')} className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl text-xs font-bold text-indigo-400 transition-all">
@@ -107,78 +131,98 @@ const QuizEditor = ({ instructorId, onSave, isLoading }) => {
 
             <div className="space-y-6">
                 <AnimatePresence>
-                    {questions.map((q, idx) => (
-                        <motion.div
-                            key={q.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 relative group hover:border-indigo-500/20 transition-all"
-                        >
-                            <button
-                                onClick={() => removeQuestion(q.id)}
-                                className="absolute top-4 right-4 text-slate-600 hover:text-rose-400 p-2 rounded-lg hover:bg-rose-500/10 transition-all"
+                    {questions.map((q, idx) => {
+                        if (!q) return null;
+                        return (
+                            <motion.div
+                                key={q.id || idx}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                                className="p-6 rounded-2xl bg-slate-900/40 border border-white/5 relative group hover:border-indigo-500/20 transition-all"
                             >
-                                <Trash2 size={18} />
-                            </button>
+                                <button
+                                    onClick={() => removeQuestion(q.id)}
+                                    className="absolute top-4 right-4 text-slate-600 hover:text-rose-400 p-2 rounded-lg hover:bg-rose-500/10 transition-all"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
 
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-indigo-500/20">
-                                    {getIcon(q.type)}
-                                    {q.type}
-                                </span>
-                                <span className="text-xs font-bold text-slate-500">MODULE #{idx + 1}</span>
-                            </div>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-[10px] font-black uppercase tracking-widest text-indigo-400 border border-indigo-500/20">
+                                        {getIcon(q.type)}
+                                        {q.type}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-500">MODULE #{idx + 1}</span>
+                                </div>
 
-                            <div className="space-y-4">
-                                <input
-                                    className="premium-input bg-transparent border-t-0 border-x-0 border-b-2 border-white/5 rounded-none px-0 focus:ring-0 focus:border-indigo-500/50 text-lg font-medium"
-                                    placeholder="Enter your question prompt here..."
-                                    value={q.text}
-                                    onChange={e => updateQuestion(q.id, 'text', e.target.value)}
-                                />
+                                <div className="space-y-4">
+                                    <input
+                                        className="premium-input bg-transparent border-t-0 border-x-0 border-b-2 border-white/5 rounded-none px-0 focus:ring-0 focus:border-indigo-500/50 text-lg font-medium"
+                                        placeholder="Enter your question prompt here..."
+                                        value={q.text}
+                                        onChange={e => updateQuestion(q.id, 'text', e.target.value)}
+                                    />
 
-                                {(q.type === 'MCQ' || q.type === 'Multi-Select') && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {q.options.map((opt, oIdx) => (
-                                            <div key={oIdx} className="flex items-center gap-3 group/opt">
-                                                <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-[10px] font-bold text-slate-400 border border-white/10 group-focus-within/opt:border-indigo-500/50">
-                                                    {String.fromCharCode(65 + oIdx)}
+                                    {(q.type === 'MCQ' || q.type === 'Multi-Select') && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {q.options.map((opt, oIdx) => (
+                                                <div key={oIdx} className="flex items-center gap-3 group/opt">
+                                                    <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-[10px] font-bold text-slate-400 border border-white/10 group-focus-within/opt:border-indigo-500/50">
+                                                        {String.fromCharCode(65 + oIdx)}
+                                                    </div>
+                                                    <input
+                                                        className="premium-input py-2"
+                                                        placeholder={`Option ${oIdx + 1}`}
+                                                        value={opt}
+                                                        onChange={e => updateOption(q.id, oIdx, e.target.value)}
+                                                    />
                                                 </div>
-                                                <input
-                                                    className="premium-input py-2"
-                                                    placeholder={`Option ${oIdx + 1}`}
-                                                    value={opt}
-                                                    onChange={e => updateOption(q.id, oIdx, e.target.value)}
-                                                />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
 
-                                <div className="pt-4 flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-2 block">Validation Key (Correct Answer)</label>
-                                        <input
-                                            className="premium-input bg-emerald-500/5 border-emerald-500/10 focus:border-emerald-500/50 text-emerald-400 font-bold"
-                                            placeholder={q.type === 'Multi-Select' ? 'e.g. A,B,C' : 'Correct Answer'}
-                                            value={Array.isArray(q.correctAnswer) ? q.correctAnswer.join(',') : q.correctAnswer}
-                                            onChange={e => updateQuestion(q.id, 'correctAnswer', q.type === 'Multi-Select' ? e.target.value.split(',') : e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="w-full md:w-32">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-2 block">Weight (Points)</label>
-                                        <input
-                                            className="premium-input text-center font-black"
-                                            type="number"
-                                            value={q.points}
-                                            onChange={e => updateQuestion(q.id, 'points', Number(e.target.value))}
-                                        />
+                                    <div className="pt-4 flex flex-col md:flex-row gap-4">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-2 block">Validation Key (Correct Answer)</label>
+                                            {q.type === 'True/False' ? (
+                                                <div className="flex gap-4">
+                                                    {['True', 'False'].map((opt) => (
+                                                        <button
+                                                            key={opt}
+                                                            onClick={() => updateQuestion(q.id, 'correctAnswer', opt)}
+                                                            className={`flex-1 py-3 rounded-xl border font-bold uppercase text-xs tracking-widest transition-all ${q.correctAnswer === opt
+                                                                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                                                : 'bg-white/5 border-white/10 text-slate-500 hover:bg-white/10'
+                                                                }`}
+                                                        >
+                                                            {opt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    className="premium-input bg-emerald-500/5 border-emerald-500/10 focus:border-emerald-500/50 text-emerald-400 font-bold"
+                                                    placeholder={q.type === 'Multi-Select' ? 'e.g. A,B,C' : 'Correct Answer'}
+                                                    value={Array.isArray(q.correctAnswer) ? q.correctAnswer.join(',') : q.correctAnswer}
+                                                    onChange={e => updateQuestion(q.id, 'correctAnswer', q.type === 'Multi-Select' ? e.target.value.split(',') : e.target.value)}
+                                                />
+                                            )}
+                                        </div>
+                                        <div className="w-full md:w-32">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-2 block">Weight (Points)</label>
+                                            <input
+                                                className="premium-input text-center font-black"
+                                                type="number"
+                                                value={q.points}
+                                                onChange={e => updateQuestion(q.id, 'points', Number(e.target.value))}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    ))}
+                            </motion.div>
+                        );
+                    })}
                 </AnimatePresence>
             </div>
 

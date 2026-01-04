@@ -1,33 +1,111 @@
 version: '3.8'
 
 services:
-  # Infrastructure
-  mongo:
-    image: mongo
-    container_name: qms_mongo
+  # ----------------------------
+  # Database (Optional Local DB)
+  # ----------------------------
+  mongodb:
+    image: mongo:latest
+    container_name: qms-mongodb
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - mongo-data:/data/db
     networks:
-      - qms_network
+      - qms-network
 
   redis:
     image: redis:alpine
-    container_name: qms_redis
+    container_name: qms-redis
     ports:
       - "6379:6379"
     networks:
-      - qms_network
+      - qms-network
 
+  # ----------------------------
   # Microservices
+  # ----------------------------
+  auth-service:
+    build: ./server/auth-service
+    container_name: qms-auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - MONGO_URI=mongodb://mongodb:27017/qms-auth
+      - JWT_SECRET=supersecretkey
+      - CLIENT_URL=http://localhost:5177
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+    networks:
+      - qms-network
+
+  quiz-service:
+    build: ./server/quiz-service
+    container_name: qms-quiz-service
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - MONGO_URI=mongodb://mongodb:27017/qms-quiz
+      - JWT_SECRET=supersecretkey
+      - CLIENT_URL=http://localhost:5177
+      - REDIS_URL=redis://redis:6379
+      # Internal service communication
+      # If Quiz service needed to talk to others, add vars here
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - qms-network
+
+  assessment-service:
+    build: ./server/assessment-service
+    container_name: qms-assessment-service
+    ports:
+      - "5003:5003"
+    environment:
+      - PORT=5003
+      - MONGO_URI=mongodb://mongodb:27017/qms-assessment
+      - QUIZ_SERVICE_URL=http://quiz-service:5002/api/quizzes
+      - JWT_SECRET=supersecretkey
+      - CLIENT_URL=http://localhost:5177
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - quiz-service
+    networks:
+      - qms-network
+
+  reporting-service:
+    build: ./server/reporting-service
+    container_name: qms-reporting-service
+    ports:
+      - "5004:5004"
+    environment:
+      - PORT=5004
+      - MONGO_URI=mongodb://mongodb:27017/qms-reporting
+      - ASSESSMENT_SERVICE_URL=http://assessment-service:5003/api/assessment
+      - JWT_SECRET=supersecretkey
+      - CLIENT_URL=http://localhost:5177
+    depends_on:
+      - mongodb
+      - assessment-service
+    networks:
+      - qms-network
+
+  # ----------------------------
+  # API Gateway
+  # ----------------------------
   api-gateway:
     build: ./server/api-gateway
-    container_name: qms_api_gateway
+    container_name: qms-api-gateway
     ports:
-      - "5000:5000"
+      - "8002:8002"
     environment:
-      - PORT=5000
+      - PORT=8002
+      # Proxy Targets (Internal Docker DNS)
       - AUTH_SERVICE_URL=http://auth-service:5001
       - QUIZ_SERVICE_URL=http://quiz-service:5002
       - ASSESSMENT_SERVICE_URL=http://assessment-service:5003
@@ -36,76 +114,31 @@ services:
       - auth-service
       - quiz-service
       - assessment-service
+      - reporting-service
     networks:
-      - qms_network
+      - qms-network
 
-  auth-service:
-    build: ./server/auth-service
-    container_name: qms_auth_service
+  # ----------------------------
+  # Frontend Client
+  # ----------------------------
+  client:
+    build: ./client
+    container_name: qms-client
     ports:
-      - "5001:5001"
+      - "5177:80"
     environment:
-      - PORT=5001
-      - MONGO_URI=mongodb://mongo:27017/qms-auth
-      - JWT_SECRET=secretscript
+      # Note: Vite vars are built-in, this only affects runtime if using a custom server.
+      # The client connects to http://localhost:8002 (Gateway) from the browser.
+      - VITE_API_GATEWAY_URL=http://localhost:8002/api
     depends_on:
-      - mongo
+      - api-gateway
     networks:
-      - qms_network
-
-  quiz-service:
-    build: ./server/quiz-service
-    container_name: qms_quiz_service
-    ports:
-      - "5002:5002"
-    environment:
-      - PORT=5002
-      - MONGO_URI=mongodb://mongo:27017/qms-quiz
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=secretscript
-    depends_on:
-      - mongo
-      - redis
-    networks:
-      - qms_network
-
-  assessment-service:
-    build: ./server/assessment-service
-    container_name: qms_assessment_service
-    ports:
-      - "5003:5003"
-    environment:
-      - PORT=5003
-      - MONGO_URI=mongodb://mongo:27017/qms-assessment
-      - REDIS_URL=redis://redis:6379
-      - QUIZ_SERVICE_URL=http://quiz-service:5002/api/quizzes
-      - JWT_SECRET=secretscript
-    depends_on:
-      - mongo
-      - redis
-      - quiz-service
-    networks:
-      - qms_network
-
-  reporting-service:
-    build: ./server/reporting-service
-    container_name: qms_reporting_service
-    ports:
-      - "5004:5004"
-    environment:
-      - PORT=5004
-      - MONGO_URI=mongodb://mongo:27017/qms-reporting
-      - ASSESSMENT_SERVICE_URL=http://assessment-service:5003/api/assessment
-      - JWT_SECRET=secretscript
-    depends_on:
-      - mongo
-      - assessment-service
-    networks:
-      - qms_network
-
-networks:
-  qms_network:
-    driver: bridge
+      - qms-network
 
 volumes:
-  mongo_data:
+  mongo-data:
+
+
+networks:
+  qms-network:
+    driver: bridge

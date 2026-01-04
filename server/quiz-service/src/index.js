@@ -14,18 +14,17 @@ const { createClient } = require('redis');
 const app = express();
 
 // Redis Client
-const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-redisClient.on('error', (err) => {
-  if (err.code !== 'ECONNREFUSED') {
-    console.log('Redis Client Error (Caching disabled)', err);
-  }
-});
-redisClient.connect().then(() => console.log('Connected to Redis')).catch(() => { });
+// const redisClient = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
+// redisClient.on('error', (err) => {
+//   if (err.code !== 'ECONNREFUSED') {
+//     console.log('Redis Client Error (Caching disabled)', err);
+//   }
+// });
+// redisClient.connect().then(() => console.log('Connected to Redis')).catch(() => { });
 
 // Make redis available in req
 app.use((req, res, next) => {
-  // req.redisClient = (redisClient && redisClient.isOpen) ? redisClient : null;
-  req.redisClient = null;
+  req.redisClient = null; // (redisClient && redisClient.isOpen) ? redisClient : null;
   next();
 });
 

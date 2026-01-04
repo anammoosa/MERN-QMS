@@ -19,4 +19,8 @@ const quizSchema = new mongoose.Schema({
   duration: { type: Number }, // in minutes
 }, { timestamps: true });
 
+// Add compound index for frequent queries
+quizSchema.index({ instructorId: 1, isPublished: 1 });
+quizSchema.index({ isPublished: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Quiz', quizSchema);

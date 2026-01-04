@@ -417,3 +417,4 @@ node seedAdmin.js
 
 **Note**: This deployment plan focuses on a hybrid approach (Vercel for frontend + Railway/Render for backend) as it's the most practical for this microservices architecture. Vercel serverless functions can work but require significant refactoring.
 
+

@@ -18,7 +18,9 @@ import {
     Clock,
     CheckCircle2,
     BookOpenCheck,
-    Briefcase
+    Briefcase,
+    Edit,
+    Globe
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -29,6 +31,7 @@ const TeacherDashboard = () => {
     const { quizzes, getQuizzes } = useQuiz();
     const [view, setView] = useState('list'); // list, create, upload, students
     const [isLoading, setIsLoading] = useState(false);
+    const [editingQuiz, setEditingQuiz] = useState(null);
 
     useEffect(() => {
         if (user) {
@@ -39,13 +42,60 @@ const TeacherDashboard = () => {
     const handleCreateQuiz = async (quizData) => {
         setIsLoading(true);
         try {
-            await axios.post(`${API_GATEWAY_URL}/quizzes/create`, quizData, { withCredentials: true });
-            toast.success('Quiz published successfully!');
+            if (editingQuiz) {
+                // Update existing quiz
+                await axios.put(`${API_GATEWAY_URL}/quizzes/${editingQuiz._id}`, quizData, { withCredentials: true });
+                toast.success('Quiz updated successfully!');
+            } else {
+                // Create new quiz
+                await axios.post(`${API_GATEWAY_URL}/quizzes/create`, quizData, { withCredentials: true });
+                toast.success('Quiz published successfully!');
+            }
             setView('list');
+            setEditingQuiz(null); // Reset editing state
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to create quiz');
+            toast.error(error.response?.data?.message || 'Failed to save quiz');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleEdit = (quiz) => {
+        setEditingQuiz(quiz);
+        setView('create');
+    };
+
+    const togglePublish = async (quiz) => {
+        // Optimistic UI Update
+        const updatedQuizzes = quizzes.map(q => q._id === quiz._id ? { ...q, isPublished: !q.isPublished } : q);
+        // We need to access setQuizzes here, but it's inside useQuiz. 
+        // Ideally useQuiz should provide specific mutators, but let's just trigger re-fetch.
+        // Actually, to make it instant, we need local state or cache invalidation.
+        try {
+            await axios.put(`${API_GATEWAY_URL}/quizzes/${quiz._id}`, { ...quiz, isPublished: !quiz.isPublished }, { withCredentials: true });
+            toast.success(quiz.isPublished ? 'Quiz unpublished (Draft)' : 'Quiz published to Student Portal');
+            getQuizzes(user.id);
+        } catch (error) {
+            toast.error('Failed to update status');
+        }
+    };
+
+    const [deleteId, setDeleteId] = useState(null);
+
+    const handleDelete = (id) => {
+        setDeleteId(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteId) return;
+        try {
+            await axios.delete(`${API_GATEWAY_URL}/quizzes/${deleteId}`, { withCredentials: true });
+            toast.success('Assessment deleted successfully');
+            getQuizzes(user.id);
+        } catch (error) {
+            toast.error('Failed to delete assessment');
+        } finally {
+            setDeleteId(null);
         }
     };
 
@@ -62,6 +112,14 @@ const TeacherDashboard = () => {
         visible: { opacity: 1, y: 0 }
     };
 
+    if (isLoading && view === 'list' && quizzes.length === 0) {
+        return (
+            <div className="min-h-screen bg-[#0b0f1a] flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <motion.div
             initial="hidden"
@@ -70,7 +128,7 @@ const TeacherDashboard = () => {
             className="min-h-screen p-4 md:p-8 bg-[#0b0f1a] text-slate-200"
         >
             {/* Header Area */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
+            <motion.header variants={cardVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20 shadow-glow animate-pulse">
                         <Briefcase className="w-9 h-9 text-indigo-400" />
@@ -99,10 +157,10 @@ const TeacherDashboard = () => {
                         <span className="font-black text-xs uppercase tracking-widest">Terminate</span>
                     </button>
                 </div>
-            </header>
+            </motion.header>
 
             {/* View Switcher / Quick Actions */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+            <motion.div variants={cardVariants} className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
                 {[
                     { id: 'list', icon: BookOpen, label: 'Repository', sub: 'Manage Quizzes' },
                     { id: 'create', icon: PlusCircle, label: 'Architect', sub: 'New Assessment' },
@@ -111,7 +169,10 @@ const TeacherDashboard = () => {
                 ].map((action) => (
                     <button
                         key={action.id}
-                        onClick={() => setView(action.id)}
+                        onClick={() => {
+                            if (action.id === 'create') setEditingQuiz(null); // Reset edit state when manually clicking 'Architect'
+                            setView(action.id);
+                        }}
                         className={`flex flex-col items-start gap-4 p-8 glass-card transition-all duration-500 group relative overflow-hidden ${view === action.id
                             ? 'bg-indigo-500/10 border-indigo-500/50 shadow-premium scale-[1.02]'
                             : 'hover:bg-white/[0.03] border-white/5 grayscale hover:grayscale-0'
@@ -129,7 +190,7 @@ const TeacherDashboard = () => {
                         )}
                     </button>
                 ))}
-            </div>
+            </motion.div>
 
             {/* Dynamic Content Rendering */}
             <AnimatePresence mode="wait">
@@ -147,11 +208,11 @@ const TeacherDashboard = () => {
                                     <PlusCircle className="text-indigo-400 w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Assessment Architect</h2>
-                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">CRAFT HIGH-FIDELITY EVALUATIONS</p>
+                                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">{editingQuiz ? 'Edit Assessment' : 'Assessment Architect'}</h2>
+                                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{editingQuiz ? 'MODIFY EXISTING MODULE' : 'CRAFT HIGH-FIDELITY EVALUATIONS'}</p>
                                 </div>
                             </div>
-                            <QuizEditor instructorId={user.id} onSave={handleCreateQuiz} isLoading={isLoading} />
+                            <QuizEditor instructorId={user.id} onSave={handleCreateQuiz} isLoading={isLoading} initialData={editingQuiz} />
                         </div>
                     )}
 
@@ -232,9 +293,29 @@ const TeacherDashboard = () => {
                                                         <BarChart3 size={18} className="transition-transform group-hover/btn:scale-110" />
                                                         Analytics
                                                     </button>
-                                                    <button className="p-3 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all">
-                                                        <Trash2 size={20} />
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => togglePublish(q)}
+                                                            className={`p-3 rounded-xl transition-all ${q.isPublished ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10'}`}
+                                                            title={q.isPublished ? "Unpublish" : "Publish to Student Portal"}
+                                                        >
+                                                            <Globe size={20} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleEdit(q)}
+                                                            className="p-3 text-slate-600 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-all"
+                                                            title="Edit Quiz"
+                                                        >
+                                                            <Edit size={20} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(q._id)}
+                                                            className="p-3 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                                                            title="Delete Quiz"
+                                                        >
+                                                            <Trash2 size={20} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -244,6 +325,51 @@ const TeacherDashboard = () => {
                         </div>
                     )}
                 </motion.div>
+            </AnimatePresence>
+
+            {/* Custom Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteId && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-[#0f1423] border border-white/10 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-orange-500" />
+
+                            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mb-6 mx-auto border border-rose-500/20">
+                                <Trash2 className="w-8 h-8 text-rose-500" />
+                            </div>
+
+                            <h3 className="text-xl font-black text-white text-center mb-2 uppercase tracking-tight">Delete Assessment?</h3>
+                            <p className="text-slate-400 text-center text-sm font-medium mb-8 leading-relaxed">
+                                This action is permanent and cannot be undone. All student results associated with this module will be expunged.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={() => setDeleteId(null)}
+                                    className="px-4 py-3 rounded-xl bg-white/5 text-slate-300 font-bold hover:bg-white/10 transition-colors uppercase tracking-wider text-xs"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="px-4 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-lg shadow-rose-500/25 transition-all uppercase tracking-wider text-xs"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </motion.div>
     );

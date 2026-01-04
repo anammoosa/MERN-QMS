@@ -60,6 +60,7 @@ export const assessmentService = {
 export const reportingService = {
   getInstructorStats: () => api.get(`${REPORTING_URL}/instructor-stats`),
   getStudentStats: () => api.get(`${REPORTING_URL}/student-stats`),
+  getStudentHistory: (userId) => api.get(`${ASSESSMENT_URL}/history/student/${userId}`),
   getPdf: (submissionId) => api.get(`${REPORTING_URL}/pdf/${submissionId}`, { responseType: 'blob' }),
 };
 

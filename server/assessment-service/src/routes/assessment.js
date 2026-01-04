@@ -101,6 +101,23 @@ router.get('/stats/student/:userId', protect, asyncHandler(async (req, res) => {
   });
 }));
 
+// Get recent valid submissions for a student
+router.get('/history/student/:userId', protect, asyncHandler(async (req, res) => {
+  if (req.user.id !== req.params.userId && req.user.role !== 'Admin') {
+    res.status(401);
+    throw new Error('Not authorized');
+  }
+
+  const submissions = await Submission.find({
+    userId: req.params.userId,
+    status: { $in: ['Submitted', 'Completed', 'Processing'] }
+  })
+    .sort({ submittedAt: -1 })
+    .limit(5);
+
+  res.json(submissions);
+}));
+
 // Get Instructor Stats
 router.post('/stats/instructor', protect, asyncHandler(async (req, res) => {
   const { quizIds } = req.body;

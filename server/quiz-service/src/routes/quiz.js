@@ -13,6 +13,7 @@ const Quiz = require('../models/Quiz');
 router.post('/create', protect, authorize('Instructor'), asyncHandler(async (req, res) => {
   const { error, value } = quizSchema.validate(req.body);
   if (error) {
+    console.log('Validation Error:', error.details[0].message);
     res.status(400);
     throw new Error(error.details[0].message);
   }
@@ -40,7 +41,7 @@ router.get('/', protect, asyncHandler(async (req, res) => {
     }
   }
 
-  const quizzes = await Quiz.find({ isPublished: true });
+  const quizzes = await Quiz.find({ isPublished: true }).select('title description duration questions instructorId createdAt');
 
   if (req.redisClient) {
     await req.redisClient.set(cacheKey, JSON.stringify(quizzes), { EX: 60 });
@@ -52,12 +53,51 @@ router.get('/', protect, asyncHandler(async (req, res) => {
 // Get Instructor's Quizzes
 router.get('/instructor/:instructorId', protect, authorize('Instructor'), asyncHandler(async (req, res) => {
   const cacheKey = `instructor_quizzes_${req.params.instructorId}`;
-  // const cachedData = await req.redisClient.get(cacheKey);
-  // if (cachedData) return res.json(JSON.parse(cachedData));
+  if (req.redisClient) {
+    const cachedData = await req.redisClient.get(cacheKey);
+    if (cachedData) return res.json(JSON.parse(cachedData));
+  }
 
-  const quizzes = await Quiz.find({ instructorId: req.params.instructorId });
-  // await req.redisClient.set(cacheKey, JSON.stringify(quizzes), { EX: 60 });
+  const quizzes = await Quiz.find({ instructorId: req.params.instructorId }).select('title description duration questions isPublished createdAt');
+  if (req.redisClient) {
+    await req.redisClient.set(cacheKey, JSON.stringify(quizzes), { EX: 60 });
+  }
   res.json(quizzes);
+}));
+
+// Update Quiz - Instructor only
+router.put('/:id', protect, authorize('Instructor'), asyncHandler(async (req, res) => {
+  const { title, description, questions, duration } = req.body;
+  const quiz = await Quiz.findById(req.params.id);
+
+  if (!quiz) {
+    res.status(404);
+    throw new Error('Quiz not found');
+  }
+
+  // Ensure only the creator can update
+  if (quiz.instructorId.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+    res.status(401);
+    throw new Error('User not authorized to update this quiz');
+  }
+
+  // Basic update
+  quiz.title = title || quiz.title;
+  quiz.description = description || quiz.description;
+  quiz.questions = questions || quiz.questions;
+  quiz.duration = duration || quiz.duration;
+  if (req.body.isPublished !== undefined) quiz.isPublished = req.body.isPublished;
+
+  await quiz.save();
+
+  // Invalidate cache
+  if (req.redisClient) {
+    await req.redisClient.del('all_quizzes');
+    await req.redisClient.del(`quiz_${req.params.id}`);
+    if (req.user) await req.redisClient.del(`instructor_quizzes_${req.user.id}`);
+  }
+
+  res.json(quiz);
 }));
 
 // Delete Quiz - Instructor only
@@ -73,6 +113,7 @@ router.delete('/:id', protect, authorize('Instructor'), asyncHandler(async (req,
   if (req.redisClient) {
     await req.redisClient.del('all_quizzes');
     await req.redisClient.del(`quiz_${req.params.id}`);
+    if (req.user) await req.redisClient.del(`instructor_quizzes_${req.user.id}`);
   }
 
   res.json({ message: 'Quiz removed' });
