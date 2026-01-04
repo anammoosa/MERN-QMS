@@ -1,6 +1,15 @@
-# MERN Quiz Management System (QMS)
+# MERN Quiz Management System (QMS) 🚀
 
-A comprehensive, enterprise-grade Quiz Management System built with the MERN stack, featuring a microservices architecture, role-based access control, and a modern glassmorphic UI. This system enables instructors to create and manage quizzes while allowing students to take assessments with real-time grading and detailed reporting.
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+A comprehensive, enterprise-grade Quiz Management System built with the MERN stack. Designed for scalability with a microservices architecture, featuring role-based access control (RBAC), real-time grading, and a premium glassmorphic UI.
+
+## 🌟 Key Highlights
+- **Microservices**: Fully decoupled services for Auth, Quiz, Assessment, and Reporting.
+- **Role-Based Access**: Granular control for Admins, Instructors, and Students.
+- **Premium UI**: Glassmorphism design with Framer Motion animations.
+- **Real-time Performance**: Sync grading and immediate feedback.
+
 
 ## 🎯 Features
 
