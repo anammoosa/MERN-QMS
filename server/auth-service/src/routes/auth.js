@@ -57,6 +57,12 @@ router.delete('/users/:id', protect, authorize('Admin'), asyncHandler(async (req
   res.json({ message: 'User removed' });
 }));
 
+// Public: Get All Instructors (for mapping)
+router.get('/instructors', asyncHandler(async (req, res) => {
+  const instructors = await User.find({ role: 'Instructor' }).select('_id username');
+  res.json(instructors);
+}));
+
 // Admin: Get All Users
 router.get('/users', protect, authorize('Admin'), asyncHandler(async (req, res) => {
   const users = await User.find().select('-password');

@@ -35,6 +35,7 @@ api.interceptors.response.use(
 export const authService = {
   login: (data) => api.post(`${AUTH_URL}/login`, data),
   register: (data) => api.post(`${AUTH_URL}/register`, data),
+  getInstructors: () => api.get(`${AUTH_URL}/instructors`),
 };
 
 export const quizService = {

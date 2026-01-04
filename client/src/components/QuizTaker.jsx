@@ -171,54 +171,66 @@ const QuizTaker = ({ quiz, onFinish }) => {
                             </div>
 
                             <div className="space-y-3">
-                                {currentQ.type === 'MCQ' || currentQ.type === 'True/False' || currentQ.type === 'Multi-Select' ? (
-                                    currentQ.options.map((opt, idx) => (
-                                        <label
-                                            key={opt}
-                                            className={`flex items-center gap-4 p-5 rounded-2xl cursor-pointer border transition-all duration-200 ${(currentQ.type === 'Multi-Select'
+                                {['MCQ', 'Multi-Select', 'True/False'].includes(currentQ.type) ? (
+                                    currentQ.options && currentQ.options.length > 0 ? (
+                                        currentQ.options.map((opt, idx) => (
+                                            <label
+                                                key={opt}
+                                                className={`flex items-center gap-4 p-5 rounded-2xl cursor-pointer border transition-all duration-200 ${(currentQ.type === 'Multi-Select'
                                                     ? (answers[currentQ._id] || []).includes(opt)
                                                     : answers[currentQ._id] === opt)
                                                     ? 'bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
                                                     : 'bg-slate-900/40 border-white/5 hover:bg-white/5 hover:border-white/10'
-                                                }`}
-                                        >
-                                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${(currentQ.type === 'Multi-Select'
+                                                    }`}
+                                            >
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-colors ${(currentQ.type === 'Multi-Select'
                                                     ? (answers[currentQ._id] || []).includes(opt)
                                                     : answers[currentQ._id] === opt)
                                                     ? 'bg-indigo-500 border-indigo-500'
                                                     : 'border-slate-700'
-                                                }`}>
-                                                {(currentQ.type === 'Multi-Select'
-                                                    ? (answers[currentQ._id] || []).includes(opt)
-                                                    : answers[currentQ._id] === opt) && (
-                                                        <CheckCircle2 size={14} className="text-white" />
-                                                    )}
-                                            </div>
-                                            <input
-                                                type={currentQ.type === 'Multi-Select' ? 'checkbox' : 'radio'}
-                                                hidden
-                                                checked={currentQ.type === 'Multi-Select' ? (answers[currentQ._id] || []).includes(opt) : answers[currentQ._id] === opt}
-                                                onChange={() => handleSelect(currentQ._id, opt, currentQ.type)}
-                                            />
-                                            <span className="text-lg font-medium text-slate-300 capitalize">
-                                                {opt}
-                                            </span>
-                                            <div className="ml-auto text-[10px] font-black text-slate-700 uppercase group-hover:text-slate-500 transition-colors">
-                                                Option {String.fromCharCode(65 + idx)}
-                                            </div>
-                                        </label>
-                                    ))
+                                                    }`}>
+                                                    {(currentQ.type === 'Multi-Select'
+                                                        ? (answers[currentQ._id] || []).includes(opt)
+                                                        : answers[currentQ._id] === opt) && (
+                                                            <CheckCircle2 size={14} className="text-white" />
+                                                        )}
+                                                </div>
+                                                <input
+                                                    type={currentQ.type === 'Multi-Select' ? 'checkbox' : 'radio'}
+                                                    hidden
+                                                    checked={currentQ.type === 'Multi-Select' ? (answers[currentQ._id] || []).includes(opt) : answers[currentQ._id] === opt}
+                                                    onChange={() => handleSelect(currentQ._id, opt, currentQ.type)}
+                                                />
+                                                <span className="text-lg font-medium text-slate-300 capitalize">
+                                                    {opt}
+                                                </span>
+                                                <div className="ml-auto text-[10px] font-black text-slate-700 uppercase group-hover:text-slate-500 transition-colors">
+                                                    Option {String.fromCharCode(65 + idx)}
+                                                </div>
+                                            </label>
+                                        ))
+                                    ) : (
+                                        <div className="p-8 text-center border border-dashed border-slate-700 rounded-2xl text-slate-500">
+                                            <AlertCircle className="mx-auto mb-2 opacity-50" />
+                                            No options configured for this question.
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="space-y-4">
-                                        <textarea
-                                            className="premium-input min-h-[150px] resize-none text-lg p-6"
-                                            placeholder="Compose your detailed response here..."
-                                            value={answers[currentQ._id] || ''}
-                                            onChange={e => handleSelect(currentQ._id, e.target.value, 'Short Answer')}
-                                        />
-                                        <div className="flex items-center gap-2 text-slate-500">
+                                        <div className="relative">
+                                            <textarea
+                                                className="w-full min-h-[150px] bg-slate-900/50 border border-white/10 rounded-2xl p-6 text-lg text-slate-200 placeholder:text-slate-600 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all resize-none leading-relaxed"
+                                                placeholder="Type your answer here..."
+                                                value={answers[currentQ._id] || ''}
+                                                onChange={e => handleSelect(currentQ._id, e.target.value, 'Short Answer')}
+                                            />
+                                            <div className="absolute bottom-4 right-4 text-xs font-bold text-slate-600 bg-slate-900/80 px-2 py-1 rounded">
+                                                {(answers[currentQ._id] || '').length} chars
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-indigo-400/60 bg-indigo-500/5 p-3 rounded-xl border border-indigo-500/10">
                                             <AlertCircle size={14} />
-                                            <span className="text-xs">Ensure your answer is clear and concise for optimal assessment.</span>
+                                            <span className="text-xs font-medium">Please provide a descriptive answer logic.</span>
                                         </div>
                                     </div>
                                 )}

@@ -23,33 +23,55 @@ const StudentDashboard = () => {
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [history, setHistory] = useState([]);
   const [selectedInstructor, setSelectedInstructor] = useState('ALL');
+  const [instructorMap, setInstructorMap] = useState({});
 
-  // Fetch history directly here or via hook - keeping it simple
+  // Fetch Instructors for mapping
   useEffect(() => {
-    import('../services/api').then(({ reportingService, quizService }) => {
-      if (user?.id) {
-        reportingService.getStudentHistory(user.id).then(async (res) => {
-          // Enrich with quiz titles if needed (or backend should populate)
-          // For now, let's assume we might need to match with 'quizzes' or fetch
-          const subs = res.data;
-          const enriched = await Promise.all(subs.map(async s => {
-            if (!s.quizTitle) {
-              try {
-                const q = await quizService.getQuiz(s.quizId);
-                return { ...s, quizTitle: q.data.title };
-              } catch (e) { return { ...s, quizTitle: 'Unknown Assessment' }; }
-            }
-            return s;
-          }));
-          setHistory(enriched);
-        }).catch(err => console.error(err));
+    const fetchInstructors = async () => {
+      try {
+        const { authService } = await import('../services/api');
+        const res = await authService.getInstructors();
+        const map = {};
+        res.data.forEach(inst => {
+          map[inst._id] = inst.username;
+        });
+        setInstructorMap(map);
+      } catch (err) {
+        console.error('Failed to fetch instructors:', err);
       }
-    });
-  }, [user]);
+    };
+    fetchInstructors();
+  }, []);
 
+  // Fetch history
   useEffect(() => {
-    getQuizzes(null); // Fetch all published quizzes
-  }, [getQuizzes, selectedQuiz]);
+    const fetchHistory = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { reportingService, quizService } = await import('../services/api');
+
+        // Parallel fetch for speed
+        const [historyRes, quizRes] = await Promise.all([
+          reportingService.getStudentHistory(user.id),
+          getQuizzes(null) // Ensures quizzes are loaded for metadata lookup
+        ]);
+
+        // Enrich history with Instructor Name from Quizzes List if available
+        const hist = historyRes.data || [];
+        setHistory(hist);
+
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+        setHistory([]);
+      }
+    };
+
+    fetchHistory();
+  }, [user, getQuizzes]);
+
+  // Helper to get instructor name
+  const getInstructorName = (id) => instructorMap[id] || `ID: ${id?.substring(0, 6)}...`;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -152,57 +174,70 @@ const StudentDashboard = () => {
           </p>
         </div>
       </motion.div>
+      {
+        history.length > 0 && (
+          <div className="mb-12">
+            <h3 className="flex items-center gap-3 text-lg font-black text-slate-400 uppercase tracking-widest mb-6 px-2">
+              <History className="text-indigo-400" /> Recent Performance
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {history.map((att) => {
+                // Find the quiz in the loaded quizzes to get instructorId
+                const quizMeta = quizzes.find(q => q._id === att.quizId);
+                const instructorName = quizMeta ? getInstructorName(quizMeta.instructorId) : 'Unknown Instructor';
 
-      {/* Recent History Section */}
-      {history.length > 0 && (
-        <div className="mb-12">
-          <h3 className="flex items-center gap-3 text-lg font-black text-slate-400 uppercase tracking-widest mb-6 px-2">
-            <History className="text-indigo-400" /> Recent Performance
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {history.map((att) => (
-              <div key={att._id} className="glass-card p-6 flex items-center justify-between border-l-4 border-l-emerald-500">
-                <div>
-                  <p className="text-white font-bold text-lg">{att.quizTitle || 'Assessment'}</p>
-                  <p className="text-slate-500 text-xs font-mono mt-1">
-                    {new Date(att.submittedAt).toLocaleDateString()} • Score: <span className="text-emerald-400 font-bold">{att.score}</span>
-                  </p>
-                </div>
-                <div className="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-black uppercase tracking-widest">
-                  {att.status}
-                </div>
-              </div>
-            ))}
+                return (
+                  <div key={att._id} className="glass-card p-6 flex items-center justify-between border-l-4 border-l-emerald-500">
+                    <div>
+                      <p className="text-white font-bold text-lg">{att.quizTitle || 'Assessment'}</p>
+                      <div className="flex flex-col mt-1">
+                        <span className="text-slate-500 text-xs font-mono">
+                          {new Date(att.submittedAt).toLocaleDateString()} • Score: <span className="text-emerald-400 font-bold">{att.score}</span>
+                        </span>
+                        <span className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mt-1">
+                          {instructorName}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest ${att.status === 'Completed' || att.status === 'Submitted' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400'
+                      }`}>
+                      {att.status}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
+        )
+      }
       {/* Instructor Filter */}
-      {quizzes.length > 0 && (
-        <div className="flex gap-4 mb-8 overflow-x-auto pb-4 no-scrollbar">
-          <button
-            onClick={() => setSelectedInstructor('ALL')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === 'ALL'
-              ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-              : 'glass-card text-slate-500 hover:text-white hover:bg-white/5'
-              }`}
-          >
-            All Instructors
-          </button>
-          {[...new Set(quizzes.map(q => q.instructorId))].map(instId => (
+      {
+        quizzes.length > 0 && (
+          <div className="flex gap-4 mb-8 overflow-x-auto pb-4 no-scrollbar">
             <button
-              key={instId}
-              onClick={() => setSelectedInstructor(instId)}
-              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === instId
+              onClick={() => setSelectedInstructor('ALL')}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === 'ALL'
                 ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
                 : 'glass-card text-slate-500 hover:text-white hover:bg-white/5'
                 }`}
             >
-              Instructor {instId.substring(0, 6)}...
+              All Instructors
             </button>
-          ))}
-        </div>
-      )}
+            {[...new Set(quizzes.map(q => q.instructorId))].map(instId => (
+              <button
+                key={instId}
+                onClick={() => setSelectedInstructor(instId)}
+                className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === instId
+                  ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                  : 'glass-card text-slate-500 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                {getInstructorName(instId)}
+              </button>
+            ))}
+          </div>
+        )
+      }
 
       {/* Quizzes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -263,7 +298,7 @@ const StudentDashboard = () => {
           ));
         })()}
       </div>
-    </motion.div>
+    </motion.div >
   );
 };
 

@@ -8,7 +8,6 @@ const Submission = require('../models/Submission');
 
 const QUIZ_SERVICE_URL = process.env.QUIZ_SERVICE_URL || 'http://localhost:5002/api/quizzes';
 
-// Grading Logic with Partial Credit
 const calculateScore = (quizQuestions, userAnswers) => {
   let totalScore = 0;
 
@@ -16,30 +15,47 @@ const calculateScore = (quizQuestions, userAnswers) => {
     const userAnswer = userAnswers.find(ua => ua.questionId.toString() === q._id.toString());
     if (!userAnswer) return;
 
+    const userSelected = userAnswer.selectedOptions;
+
     if (q.type === 'MCQ' || q.type === 'True/False') {
-      if (userAnswer.selectedOptions === q.correctAnswer) {
-        totalScore += q.points;
+      // Comparison: String vs String
+      if (typeof userSelected === 'string' && typeof q.correctAnswer === 'string') {
+        if (userSelected.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+          totalScore += (q.points || 1);
+        }
+      }
+    } else if (q.type === 'Short Answer') {
+      // Simple case-insensitive match for MVP
+      if (typeof userSelected === 'string' && typeof q.correctAnswer === 'string') {
+        if (userSelected.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+          totalScore += (q.points || 1);
+        }
       }
     } else if (q.type === 'Multi-Select') {
       const correctAnswers = q.correctAnswer;
-      const userSelected = userAnswer.selectedOptions;
 
       if (Array.isArray(correctAnswers) && Array.isArray(userSelected)) {
-        const matched = userSelected.filter(opt => correctAnswers.includes(opt)).length;
-        const incorrect = userSelected.filter(opt => !correctAnswers.includes(opt)).length;
+        const correctSet = new Set(correctAnswers.map(a => a.trim().toLowerCase()));
+        const userSet = new Set(userSelected.map(a => a.trim().toLowerCase()));
 
-        // Partial credit: (matched - incorrect) / totalCorrect * points, capped at 0
-        let partial = ((matched - incorrect) / correctAnswers.length) * q.points;
+        let matched = 0;
+        userSet.forEach(ans => {
+          if (correctSet.has(ans)) matched++;
+        });
+
+        const incorrect = userSet.size - matched;
+
+        // Partial credit logic
+        let partial = ((matched - incorrect) / correctSet.size) * (q.points || 1);
         totalScore += Math.max(0, partial);
       }
     }
   });
 
-  return totalScore;
+  return Math.round(totalScore * 10) / 10; // Round to 1 decimal
 };
 
-const Queue = require('bull');
-const gradingQueue = new Queue('grading', process.env.REDIS_URL || 'redis://localhost:6379');
+// ... Queue definition (ignored) ...
 
 router.post('/submit', protect, asyncHandler(async (req, res) => {
   const { error, value } = submissionSchema.validate(req.body);
@@ -51,26 +67,41 @@ router.post('/submit', protect, asyncHandler(async (req, res) => {
   const { quizId, answers } = value;
   const userId = req.user.id;
 
-  // Create initial submission with 'Processing' status
-  const submission = new Submission({
-    userId,
-    quizId,
-    answers,
-    score: 0, // Placeholder
-    status: 'Processing',
-    submittedAt: new Date()
-  });
+  // Fetch quiz FIRST to calculate score immediately (Synchronous Grading)
+  try {
+    const quizResponse = await axios.get(`${QUIZ_SERVICE_URL}/${quizId}`, {
+      headers: { Authorization: req.headers.authorization }
+    });
+    const quiz = quizResponse.data;
 
-  await submission.save();
+    if (!quiz) {
+      throw new Error('Quiz not found');
+    }
 
-  // Add to Queue
-  gradingQueue.add({
-    submissionId: submission._id,
-    quizId,
-    answers
-  });
+    const score = calculateScore(quiz.questions, answers);
 
-  res.status(201).json({ message: 'Submission received, grading in progress.', submissionId: submission._id });
+    const submission = new Submission({
+      userId,
+      quizId,
+      answers,
+      score,
+      status: 'Submitted', // Directly Submitted
+      submittedAt: new Date()
+    });
+
+    await submission.save();
+
+    res.status(201).json({
+      message: 'Assessment completed successfully.',
+      submissionId: submission._id,
+      score
+    });
+
+  } catch (err) {
+    console.error('Submission processing failed:', err.message);
+    res.status(500);
+    throw new Error('Failed to process submission.');
+  }
 }));
 
 // Save Draft
@@ -103,7 +134,7 @@ router.get('/stats/student/:userId', protect, asyncHandler(async (req, res) => {
 
 // Get recent valid submissions for a student
 router.get('/history/student/:userId', protect, asyncHandler(async (req, res) => {
-  if (req.user.id !== req.params.userId && req.user.role !== 'Admin') {
+  if (req.user.id.toString() !== req.params.userId && req.user.role !== 'Admin') {
     res.status(401);
     throw new Error('Not authorized');
   }
@@ -115,7 +146,30 @@ router.get('/history/student/:userId', protect, asyncHandler(async (req, res) =>
     .sort({ submittedAt: -1 })
     .limit(5);
 
-  res.json(submissions);
+  // Fetch quiz titles to enrich submissions (single batch call)
+  try {
+    const quizIds = submissions.map(s => s.quizId.toString());
+    if (quizIds.length > 0) {
+      const quizResponse = await axios.get(`${QUIZ_SERVICE_URL}`);
+      const quizzes = Array.isArray(quizResponse.data) ? quizResponse.data : [];
+      const quizMap = new Map(quizzes.map(q => [q._id.toString(), q.title]));
+
+      const enrichedSubmissions = submissions.map(submission => ({
+        ...submission.toObject(),
+        quizTitle: quizMap.get(submission.quizId.toString()) || 'Unknown Assessment'
+      }));
+
+      return res.json(enrichedSubmissions);
+    }
+  } catch (error) {
+    console.error('Error fetching quiz titles:', error);
+    // If quiz service fails, return submissions without titles
+  }
+
+  res.json(submissions.map(s => ({
+    ...s.toObject(),
+    quizTitle: 'Unknown Assessment'
+  })));
 }));
 
 // Get Instructor Stats
@@ -145,7 +199,9 @@ router.post('/upload-submission', protect, asyncHandler(async (req, res) => {
   }
 
   // Fetch quiz questions from Quiz Service
-  const response = await axios.get(`${QUIZ_SERVICE_URL}`);
+  const response = await axios.get(`${QUIZ_SERVICE_URL}`, {
+    headers: { Authorization: req.headers.authorization }
+  });
   const quizzes = response.data;
   const quiz = quizzes.find(q => q._id.toString() === quizId);
 
