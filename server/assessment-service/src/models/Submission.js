@@ -8,7 +8,7 @@ const submissionSchema = new mongoose.Schema({
     selectedOptions: mongoose.Schema.Types.Mixed, // Array or string
   }],
   score: { type: Number, default: 0 },
-  status: { type: String, enum: ['Draft', 'Submitted'], default: 'Draft' },
+  status: { type: String, enum: ['Draft', 'Submitted', 'Processing', 'Completed'], default: 'Draft' },
   submittedAt: { type: Date }
 }, { timestamps: true });
 

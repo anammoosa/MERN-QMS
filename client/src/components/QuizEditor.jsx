@@ -157,6 +157,7 @@ const QuizEditor = ({ instructorId, onSave, isLoading, initialData = null }) => 
                                 </div>
 
                                 <div className="space-y-4">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 block">Question Prompt</label>
                                     <input
                                         className="premium-input bg-transparent border-t-0 border-x-0 border-b-2 border-white/5 rounded-none px-0 focus:ring-0 focus:border-indigo-500/50 text-lg font-medium"
                                         placeholder="Enter your question prompt here..."

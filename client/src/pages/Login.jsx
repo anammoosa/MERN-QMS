@@ -89,11 +89,8 @@ const Login = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-white/5 text-center">
-          <p className="text-slate-400 text-sm">
-            New to the platform?
-            <Link to="/register" className="ml-2 text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-              Create an account
-            </Link>
+          <p className="text-slate-500 text-xs italic">
+            Access protected. Contact administrator for enrollment.
           </p>
         </div>
 

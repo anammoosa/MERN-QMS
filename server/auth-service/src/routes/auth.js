@@ -5,34 +5,10 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const { registerSchema, loginSchema } = require('../validation/authValidation');
 
+// Public Registration is DISABLED
 router.post('/register', asyncHandler(async (req, res) => {
-  const { error, value } = registerSchema.validate(req.body);
-  if (error) {
-    res.status(400);
-    throw new Error(error.details[0].message);
-  }
-
-  const { username, password } = value;
-
-  const existingUser = await User.findOne({ username });
-  if (existingUser) {
-    res.status(400);
-    throw new Error('Username already exists');
-  }
-
-  // Public registration is restricted to Students
-  const role = 'Student';
-
-  const user = new User({ username, password, role });
-  await user.save();
-
-  res.status(201).json({
-    message: 'User registered successfully',
-    user: {
-      id: user._id,
-      username: user.username,
-    }
-  });
+  res.status(403);
+  throw new Error('Public registration is disabled. Please contact an administrator.');
 }));
 
 // Admin: Create User (Instructor/Admin)

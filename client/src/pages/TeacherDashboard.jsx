@@ -170,7 +170,7 @@ const TeacherDashboard = () => {
                     <button
                         key={action.id}
                         onClick={() => {
-                            if (action.id === 'create') setEditingQuiz(null); // Reset edit state when manually clicking 'Architect'
+                            if (action.id === 'create') setEditingQuiz(null);
                             setView(action.id);
                         }}
                         className={`flex flex-col items-start gap-4 p-8 glass-card transition-all duration-500 group relative overflow-hidden ${view === action.id

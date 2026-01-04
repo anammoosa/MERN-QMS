@@ -41,7 +41,7 @@ router.get('/', protect, asyncHandler(async (req, res) => {
     }
   }
 
-  const quizzes = await Quiz.find({ isPublished: true }).select('title description duration questions instructorId createdAt');
+  const quizzes = await Quiz.find({ isPublished: true }).select('title description duration questions instructorId createdAt').lean();
 
   if (req.redisClient) {
     await req.redisClient.set(cacheKey, JSON.stringify(quizzes), { EX: 60 });
@@ -58,7 +58,7 @@ router.get('/instructor/:instructorId', protect, authorize('Instructor'), asyncH
     if (cachedData) return res.json(JSON.parse(cachedData));
   }
 
-  const quizzes = await Quiz.find({ instructorId: req.params.instructorId }).select('title description duration questions isPublished createdAt');
+  const quizzes = await Quiz.find({ instructorId: req.params.instructorId }).select('title description duration questions isPublished createdAt').lean();
   if (req.redisClient) {
     await req.redisClient.set(cacheKey, JSON.stringify(quizzes), { EX: 60 });
   }

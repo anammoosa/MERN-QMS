@@ -22,6 +22,7 @@ const StudentDashboard = () => {
   const { quizzes, getQuizzes, loading } = useQuiz();
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [history, setHistory] = useState([]);
+  const [selectedInstructor, setSelectedInstructor] = useState('ALL');
 
   // Fetch history directly here or via hook - keeping it simple
   useEffect(() => {
@@ -176,16 +177,51 @@ const StudentDashboard = () => {
         </div>
       )}
 
+      {/* Instructor Filter */}
+      {quizzes.length > 0 && (
+        <div className="flex gap-4 mb-8 overflow-x-auto pb-4 no-scrollbar">
+          <button
+            onClick={() => setSelectedInstructor('ALL')}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === 'ALL'
+              ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+              : 'glass-card text-slate-500 hover:text-white hover:bg-white/5'
+              }`}
+          >
+            All Instructors
+          </button>
+          {[...new Set(quizzes.map(q => q.instructorId))].map(instId => (
+            <button
+              key={instId}
+              onClick={() => setSelectedInstructor(instId)}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedInstructor === instId
+                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                : 'glass-card text-slate-500 hover:text-white hover:bg-white/5'
+                }`}
+            >
+              Instructor {instId.substring(0, 6)}...
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Quizzes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {quizzes.length === 0 ? (
-          <div className="col-span-full py-32 text-center glass-card bg-white/[0.02]">
-            <Calendar className="w-16 h-16 mx-auto mb-6 text-slate-700 opacity-20" />
-            <h3 className="text-xl font-bold text-slate-500 mb-2 uppercase tracking-widest">No Active Sessions</h3>
-            <p className="text-slate-600">Stand by for upcoming assessment modules.</p>
-          </div>
-        ) : (
-          quizzes.map(q => (
+        {(() => {
+          const filteredQuizzes = selectedInstructor === 'ALL'
+            ? quizzes
+            : quizzes.filter(q => q.instructorId === selectedInstructor);
+
+          if (filteredQuizzes.length === 0) {
+            return (
+              <div className="col-span-full py-32 text-center glass-card bg-white/[0.02]">
+                <Calendar className="w-16 h-16 mx-auto mb-6 text-slate-700 opacity-20" />
+                <h3 className="text-xl font-bold text-slate-500 mb-2 uppercase tracking-widest">No Active Sessions</h3>
+                {selectedInstructor !== 'ALL' && <p className="text-slate-600">No assessments available for this instructor.</p>}
+              </div>
+            );
+          }
+
+          return filteredQuizzes.map(q => (
             <motion.div
               key={q._id}
               variants={cardVariants}
@@ -224,8 +260,8 @@ const StudentDashboard = () => {
                 INITIATE ATTEMPT
               </button>
             </motion.div>
-          ))
-        )}
+          ));
+        })()}
       </div>
     </motion.div>
   );
