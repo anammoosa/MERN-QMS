@@ -11,7 +11,13 @@ const app = express();
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177', 'http://localhost:5178'],
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:4173', // Vite preview
+        'http://localhost:5200',
+        'http://localhost:3000'
+    ],
     credentials: true
 }));
 
