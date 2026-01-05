@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run install-all || true
+      - name: Run audit
+        run: npm audit --audit-level=moderate || true
+      - name: Report Git info
+        run: |
+          echo "Commit: $(git rev-parse --short HEAD)"
+          git --no-pager log -1 --pretty=format:'%h %an <%ae> %s'

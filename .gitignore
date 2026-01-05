@@ -1,4 +1,14 @@
 node_modules
+/.env
+.env
+*.env
+/.env.local
+.DS_Store
+dist
+build
+.local
+.env.*
+node_modules
 # Logs
 logs
 *.log
